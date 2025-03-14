@@ -44,4 +44,4 @@ First, initialize your Node.js project and install the required packages:
 mkdir online-banking
 cd online-banking
 npm init -y
-npm install express mysql2 bcryptjs jsonwebtoken dotenv cors body-pars
+npm install express mysql2 bcryptjs jsonwebtoken dotenv cors body-parser
