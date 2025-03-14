@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Online Banking</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        
+        h2 {
+            color: #3498db;
+            margin-top: 25px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        
+        input {
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        #balance {
+            font-size: 18px;
+            font-weight: bold;
+            color: #27ae60;
+        }
+        
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        #logoutBtn {
+            background-color: #e74c3c;
+            float: right;
+        }
+        
+        #dashboardSection {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Online Banking</h1>
+        
+        <div id="message" class="message"></div>
+        
+        <div id="authSection">
+            <div class="section">
+                <h2>Register</h2>
+                <input type="text" id="regUser" placeholder="Username"><br>
+                <input type="password" id="regPass" placeholder="Password"><br>
+                <button onclick="register()">Register</button>
+            </div>
+            
+            <div class="section">
+                <h2>Login</h2>
+                <input type="text" id="loginUser" placeholder="Username"><br>
+                <input type="password" id="loginPass" placeholder="Password"><br>
+                <button onclick="login()">Login</button>
+            </div>
+        </div>
+        
+        <div id="dashboardSection">
+            <button id="logoutBtn" onclick="logout()">Logout</button>
+            <h2>Welcome <span id="username"></span></h2>
+            
+            <div class="section">
+                <h2>Balance</h2>
+                <p id="balance">$0.00</p>
+                <button onclick="getBalance()">Refresh Balance</button>
+            </div>
+            
+            <div class="section">
+                <h2>Deposit</h2>
+                <input type="number" id="depositAmount" placeholder="Amount"><br>
+                <button onclick="deposit()">Deposit</button>
+            </div>
+            
+            <div class="section">
+                <h2>Withdraw</h2>
+                <input type="number" id="withdrawAmount" placeholder="Amount"><br>
+                <button onclick="withdraw()">Withdraw</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let token = "";
+        let currentUser = "";
+        
+        // Show notification message
+        function showMessage(message, isSuccess) {
+            const messageBox = document.getElementById('message');
+            messageBox.textContent = message;
+            messageBox.className = isSuccess ? 'message success' : 'message error';
+            messageBox.style.display = 'block';
+            
+            // Hide message after 3 seconds
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Register function
+        function register() {
+            const username = document.getElementById('regUser').value;
+            const password = document.getElementById('regPass').value;
+            
+            if (!username || !password) {
+                showMessage("Please enter both username and password", false);
+                return;
+            }
+            
+            fetch("http://localhost:5000/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                showMessage(data.message, data.message.includes("successful"));
+                if (data.message.includes("successful")) {
+                    document.getElementById('loginUser').value = username;
+                    document.getElementById('regUser').value = '';
+                    document.getElementById('regPass').value = '';
+                }
+            })
+            .catch(err => {
+                showMessage("Registration failed. Please try again.", false);
+            });
+        }
+        
+        // Login function
+        function login() {
+            const username = document.getElementById('loginUser').value;
+            const password = document.getElementById('loginPass').value;
+            
+            if (!username || !password) {
+                showMessage("Please enter both username and password", false);
+                return;
+            }
+            
+            fetch("http://localhost:5000/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.token) {
+                    token = data.token;
+                    currentUser = username;
+                    localStorage.setItem('bankToken', token);
+                    localStorage.setItem('bankUsername', username);
+                    showMessage("Login successful!", true);
+                    showDashboard();
+                    getBalance();
+                } else {
+                    showMessage("Login failed. Check your credentials.", false);
+                }
+            })
+            .catch(err => {
+                showMessage("Login failed. Please try again.", false);
+            });
+        }
+        
+        // Show dashboard after login
+        function showDashboard() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('dashboardSection').style.display = 'block';
+            document.getElementById('username').textContent = currentUser;
+        }
+        
+        // Logout function
+        function logout() {
+            token = "";
+            currentUser = "";
+            localStorage.removeItem('bankToken');
+            localStorage.removeItem('bankUsername');
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('dashboardSection').style.display = 'none';
+            document.getElementById('loginUser').value = '';
+            document.getElementById('loginPass').value = '';
+            showMessage("Successfully logged out", true);
+        }
+        
+        // Get account balance
+        function getBalance() {
+            fetch("http://localhost:5000/balance", {
+                headers: { "Authorization": `Bearer ${token}` }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to fetch balance");
+                return res.json();
+            })
+            .then(data => {
+                document.getElementById('balance').innerText = `$${parseFloat(data.balance).toFixed(2)}`;
+            })
+            .catch(err => {
+                showMessage("Error fetching balance", false);
+                if (err.message.includes("Invalid token")) {
+                    logout();
+                }
+            });
+        }
+        
+        // Deposit money
+        function deposit() {
+            const amount = parseFloat(document.getElementById('depositAmount').value);
+            
+            if (!amount || amount <= 0) {
+                showMessage("Please enter a valid amount", false);
+                return;
+            }
+            
+            fetch("http://localhost:5000/deposit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ amount })
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to deposit");
+                return res.json();
+            })
+            .then(data => {
+                showMessage(data.message, true);
+                document.getElementById('depositAmount').value = '';
+                getBalance();
+            })
+            .catch(err => {
+                showMessage("Error making deposit", false);
+            });
+        }
+        
+        // Withdraw money
+        function withdraw() {
+            const amount = parseFloat(document.getElementById('withdrawAmount').value);
+            
+            if (!amount || amount <= 0) {
+                showMessage("Please enter a valid amount", false);
+                return;
+            }
+            
+            fetch("http://localhost:5000/withdraw", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ amount })
+            })
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(data => {
+                        throw new Error(data.message);
+                    });
+                }
+                return res.json();
+            })
+            .then(data => {
+                showMessage(data.message, true);
+                document.getElementById('withdrawAmount').value = '';
+                getBalance();
+            })
+            .catch(err => {
+                showMessage(err.message || "Error making withdrawal", false);
+            });
+        }
+        
+        // Check if user is already logged in
+        window.onload = function() {
+            const savedToken = localStorage.getItem('bankToken');
+            const savedUser = localStorage.getItem('bankUsername');
+            if (savedToken && savedUser) {
+                token = savedToken;
+                currentUser = savedUser;
+                showDashboard();
+                getBalance();
+            }
+        };
+    </script>
+</body>
+</html>
